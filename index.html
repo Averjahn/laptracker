@@ -98,6 +98,21 @@ label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-botto
 .timegrid input{text-align:center;font-family:var(--mono);font-size:22px;font-weight:700;padding:12px 6px;font-variant-numeric:tabular-nums}
 .timegrid .tf small{display:block;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
 
+/* Mode toggle */
+.modeToggle{display:flex;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:3px;gap:3px}
+.modeBtn{flex:1;font-family:var(--sans);font-weight:600;font-size:13px;padding:9px 8px;border:none;border-radius:8px;
+  background:transparent;color:var(--mut);cursor:pointer;transition:.16s}
+.modeBtn.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 14px rgba(255,46,77,.3)}
+.modeBtn:not(.on):hover{color:var(--txt)}
+.countRow{display:flex;align-items:center;gap:14px}
+.countRow input{width:110px;text-align:center;font-family:var(--mono);font-size:26px;font-weight:700;padding:12px 6px}
+.countRow .cbtn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line2);background:var(--panel2);
+  color:var(--txt);font-size:20px;font-weight:700;cursor:pointer;flex-shrink:0;transition:.14s}
+.countRow .cbtn:hover{border-color:var(--blue);color:var(--blue)}
+.countRow .clabel{color:var(--mut);font-size:13px}
+.cntbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(62,166,255,.14);color:var(--blue);
+  font-size:12px;font-weight:700;padding:5px 10px;border-radius:20px;letter-spacing:.2px}
+
 /* Table */
 .laps{width:100%;border-collapse:collapse;font-size:14px}
 .laps th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);
@@ -216,14 +231,30 @@ label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-botto
         </div>
       </div>
       <div class="field">
+        <label>Тип записи</label>
+        <div class="modeToggle" id="modeToggle">
+          <button type="button" class="modeBtn on" data-mode="timed">⏱ На время</button>
+          <button type="button" class="modeBtn" data-mode="count">🔁 Просто круги</button>
+        </div>
+      </div>
+      <div class="field" id="timeField">
         <label>Время круга</label>
         <div class="timegrid">
           <div class="tf"><input id="mMin" type="number" min="0" max="59" placeholder="0" inputmode="numeric"><small>мин</small></div>
           <div class="tf"><input id="mSec" type="number" min="0" max="59" placeholder="00" inputmode="numeric"><small>сек</small></div>
           <div class="tf"><input id="mMs" type="number" min="0" max="999" placeholder="000" inputmode="numeric"><small>мс</small></div>
         </div>
-        <div class="mini" id="prevBest"></div>
       </div>
+      <div class="field" id="countField" style="display:none">
+        <label>Сколько кругов проехал</label>
+        <div class="countRow">
+          <button type="button" class="cbtn" id="cntMinus">−</button>
+          <input id="mCount" type="number" min="1" max="999" value="1" inputmode="numeric">
+          <button type="button" class="cbtn" id="cntPlus">+</button>
+          <span class="clabel">без хронометража, просто счётчик</span>
+        </div>
+      </div>
+      <div class="mini" id="prevBest"></div>
       <div class="field">
         <label>Заметка <span style="text-transform:none;color:var(--dim)">(необязательно)</span></label>
         <input id="mNote" placeholder="Например: мокрая трасса, новая резина…">
@@ -258,6 +289,17 @@ let curTrack = localStorage.getItem(LST) || TRACKS[0].id;
 let sortKey='date', sortDir=-1;
 let selCar = CARS[0].id;
 let hidden = new Set(); // hidden cars on chart
+let mode = 'timed'; // 'timed' | 'count'
+
+function ruLapsWord(n){
+  const n10=n%10, n100=n%100;
+  if(n100>=11&&n100<=14) return 'кругов';
+  if(n10===1) return 'круг';
+  if(n10>=2&&n10<=4) return 'круга';
+  return 'кругов';
+}
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function lapCount(l){ return l.ms!=null ? 1 : (l.count||1); }
 
 function load(){ try{return JSON.parse(localStorage.getItem(LS))||[]}catch(e){return []} }
 function save(){ localStorage.setItem(LS, JSON.stringify(laps)); }
@@ -290,29 +332,30 @@ function trackLaps(){ return laps.filter(l=>l.track===curTrack); }
 
 function renderStats(){
   const tl = trackLaps();
-  const total = tl.length;
-  const best = tl.length ? Math.min(...tl.map(l=>l.ms)) : null;
-  const bestLap = tl.find(l=>l.ms===best);
-  // best car (by count)
-  const byCar={}; tl.forEach(l=>byCar[l.car]=(byCar[l.car]||0)+1);
+  const total = tl.reduce((s,l)=>s+lapCount(l),0);
+  const timed = tl.filter(l=>l.ms!=null);
+  const best = timed.length ? Math.min(...timed.map(l=>l.ms)) : null;
+  const bestLap = timed.find(l=>l.ms===best);
+  // best car (by lap count)
+  const byCar={}; tl.forEach(l=>byCar[l.car]=(byCar[l.car]||0)+lapCount(l));
   const favId = Object.keys(byCar).sort((a,b)=>byCar[b]-byCar[a])[0];
-  const avg = tl.length ? Math.round(tl.reduce((s,l)=>s+l.ms,0)/tl.length) : null;
-  // improvement: first vs best chronologically
-  const chrono=[...tl].sort((a,b)=>a.date.localeCompare(b.date));
+  const avg = timed.length ? Math.round(timed.reduce((s,l)=>s+l.ms,0)/timed.length) : null;
+  // improvement: first vs best chronologically (timed laps only)
+  const chrono=[...timed].sort((a,b)=>a.date.localeCompare(b.date));
   let improv=null;
   if(chrono.length>1){ improv = chrono[0].ms - best; }
 
   stats.innerHTML = `
     <div class="stat"><div class="k">Всего кругов</div><div class="v mono">${total}</div><div class="s">на этой трассе</div></div>
     <div class="stat hl"><div class="k">Лучший круг</div><div class="v mono">${best!=null?fmt(best):'—'}</div><div class="s">${bestLap?carById(bestLap.car).name:'—'}</div></div>
-    <div class="stat"><div class="k">Средний темп</div><div class="v mono">${avg!=null?fmt(avg):'—'}</div><div class="s">по всем заездам</div></div>
+    <div class="stat"><div class="k">Средний темп</div><div class="v mono">${avg!=null?fmt(avg):'—'}</div><div class="s">по хронометрированным</div></div>
     <div class="stat"><div class="k">Прогресс</div><div class="v mono" style="color:${improv>0?'var(--good)':'var(--txt)'}">${improv!=null&&improv>0?'−'+fmtDelta(improv).slice(1):'—'}</div><div class="s">${favId?'фаворит: '+carById(favId).name:'нет данных'}</div></div>
   `;
 }
 
 /* ---------- Table ---------- */
 function bestPerCar(tl){
-  const m={}; tl.forEach(l=>{ if(m[l.car]==null||l.ms<m[l.car]) m[l.car]=l.ms; }); return m;
+  const m={}; tl.forEach(l=>{ if(l.ms==null) return; if(m[l.car]==null||l.ms<m[l.car]) m[l.car]=l.ms; }); return m;
 }
 function renderTable(){
   const tl = trackLaps();
@@ -326,14 +369,19 @@ function renderTable(){
   const pb = bestPerCar(tl);
   const sorted=[...tl].sort((a,b)=>{
     let r=0;
-    if(sortKey==='date') r=a.date.localeCompare(b.date);
-    else if(sortKey==='time') r=a.ms-b.ms;
-    else if(sortKey==='car') r=carById(a.car).name.localeCompare(carById(b.car).name);
-    return r*sortDir;
+    if(sortKey==='date') r=a.date.localeCompare(b.date)*sortDir;
+    else if(sortKey==='time'){
+      if(a.ms==null && b.ms==null) r=0;
+      else if(a.ms==null) return 1;
+      else if(b.ms==null) return -1;
+      else r=(a.ms-b.ms)*sortDir;
+    }
+    else if(sortKey==='car') r=carById(a.car).name.localeCompare(carById(b.car).name)*sortDir;
+    return r;
   });
-  // delta vs previous chronological lap in same car
+  // delta vs previous chronological lap in same car (timed laps only)
   const chronoByCar={};
-  [...tl].sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{
+  [...tl].filter(l=>l.ms!=null).sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{
     (chronoByCar[l.car]=chronoByCar[l.car]||[]).push(l);
   });
   const prevMap={};
@@ -341,14 +389,17 @@ function renderTable(){
 
   const ar = k => sortKey===k ? (sortDir>0?'▲':'▼') : '';
   const rows = sorted.map(l=>{
-    const c=carById(l.car); const isPB = l.ms===pb[l.car];
+    const c=carById(l.car); const isPB = l.ms!=null && l.ms===pb[l.car];
     const d = prevMap[l.id];
     const dHtml = d==null?'<span style="color:var(--dim)">—</span>':
       `<span class="delta ${d<0?'up':'down'}">${fmtDelta(d)}</span>`;
+    const timeCell = l.ms!=null
+      ? `<span class="tm">${fmt(l.ms)}</span>${isPB?'<span class="pb">★ PB</span>':''}`
+      : `<span class="cntbadge">🔁 × ${l.count||1}</span>`;
     return `<tr>
       <td style="color:var(--mut);white-space:nowrap">${ruDate(l.date)}</td>
       <td><span class="carpill"><img src="${c.img}" alt="">${c.name}</span></td>
-      <td><span class="tm">${fmt(l.ms)}</span>${isPB?'<span class="pb">★ PB</span>':''}</td>
+      <td>${timeCell}</td>
       <td>${dHtml}</td>
       <td class="note" title="${(l.note||'').replace(/"/g,'&quot;')}">${l.note||'<span style="color:var(--dim)">—</span>'}</td>
       <td style="text-align:right"><button class="del" data-id="${l.id}" title="Удалить">✕</button></td>
@@ -396,13 +447,13 @@ function drawChart(){
   const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,W,H);
 
-  const tl=trackLaps().filter(l=>!hidden.has(l.car));
+  const tl=trackLaps().filter(l=>!hidden.has(l.car) && l.ms!=null);
   const pad={l:56,r:14,t:16,b:28};
   const iw=W-pad.l-pad.r, ih=H-pad.t-pad.b;
 
   if(tl.length<1){
     ctx.fillStyle='#5c6778'; ctx.font='13px Inter'; ctx.textAlign='center';
-    ctx.fillText('Добавь круги, чтобы увидеть динамику', W/2, H/2);
+    ctx.fillText('Добавь круги на время, чтобы увидеть динамику', W/2, H/2);
     return;
   }
   const times=tl.map(l=>l.ms);
@@ -453,12 +504,20 @@ function drawChart(){
 function openModal(){
   fillTracks(); mTrack.value=curTrack;
   mDate.value=new Date().toISOString().slice(0,10);
-  mMin.value=''; mSec.value=''; mMs.value=''; mNote.value='';
+  mMin.value=''; mSec.value=''; mMs.value=''; mNote.value=''; mCount.value=1;
   selCar = CARS[0].id;
+  setMode('timed');
   renderCarPicker(); updatePrevBest();
   modal.classList.add('on'); setTimeout(()=>mMin.focus(),50);
 }
 function closeModal(){ modal.classList.remove('on'); }
+function setMode(m){
+  mode=m;
+  modeToggle.querySelectorAll('.modeBtn').forEach(b=>b.classList.toggle('on', b.dataset.mode===m));
+  timeField.style.display = m==='timed' ? '' : 'none';
+  countField.style.display = m==='count' ? '' : 'none';
+  setTimeout(()=>{ (m==='timed'?mMin:mCount).focus(); }, 30);
+}
 function renderCarPicker(){
   carPicker.innerHTML = CARS.map(c=>`
     <div class="carcard ${c.id===selCar?'sel':''}" data-id="${c.id}">
@@ -473,24 +532,37 @@ function renderCarPicker(){
 function updatePrevBest(){
   const tid=mTrack.value;
   const rel=laps.filter(l=>l.track===tid && l.car===selCar);
-  if(rel.length){
-    const b=Math.min(...rel.map(l=>l.ms));
-    prevBest.innerHTML=`Твой рекорд на ${carById(selCar).name}: <b style="color:var(--gold)">${fmt(b)}</b>`;
-  } else prevBest.textContent='Первый круг на этой машине здесь!';
+  const timedRel=rel.filter(l=>l.ms!=null);
+  const totalCount=rel.reduce((s,l)=>s+lapCount(l),0);
+  let parts=[];
+  if(timedRel.length){
+    const b=Math.min(...timedRel.map(l=>l.ms));
+    parts.push(`рекорд: <b style="color:var(--gold)">${fmt(b)}</b>`);
+  }
+  if(totalCount) parts.push(`всего кругов: <b style="color:var(--txt)">${totalCount}</b>`);
+  prevBest.innerHTML = parts.length ? `${carById(selCar).name} — ${parts.join(' · ')}` : 'Первый круг на этой машине здесь!';
 }
 function saveLap(){
-  const m=+mMin.value||0, s=+mSec.value||0, ms=+mMs.value||0;
-  if(s>59||ms>999){ toast('Секунды ≤ 59, миллисекунды ≤ 999',true); return; }
-  const total=m*60000+s*1000+ms;
-  if(total<=0){ toast('Введи время круга',true); return; }
-  const prevBestMs = (()=>{const r=laps.filter(l=>l.track===mTrack.value&&l.car===selCar);return r.length?Math.min(...r.map(l=>l.ms)):null;})();
-  laps.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    car:selCar, track:mTrack.value, date:mDate.value, ms:total, note:mNote.value.trim()});
-  save();
-  curTrack=mTrack.value; trackSel.value=curTrack; localStorage.setItem(LST,curTrack);
-  closeModal(); renderAll();
-  if(prevBestMs!=null && total<prevBestMs) toast(`🏆 Новый рекорд! На ${fmtDelta(total-prevBestMs).slice(1)} с быстрее`);
-  else toast('Круг записан');
+  if(mode==='timed'){
+    const m=+mMin.value||0, s=+mSec.value||0, ms=+mMs.value||0;
+    if(s>59||ms>999){ toast('Секунды ≤ 59, миллисекунды ≤ 999',true); return; }
+    const total=m*60000+s*1000+ms;
+    if(total<=0){ toast('Введи время круга',true); return; }
+    const prevBestMs = (()=>{const r=laps.filter(l=>l.track===mTrack.value&&l.car===selCar&&l.ms!=null);return r.length?Math.min(...r.map(l=>l.ms)):null;})();
+    laps.push({id:genId(), car:selCar, track:mTrack.value, date:mDate.value, ms:total, count:1, note:mNote.value.trim()});
+    save();
+    curTrack=mTrack.value; trackSel.value=curTrack; localStorage.setItem(LST,curTrack);
+    closeModal(); renderAll();
+    if(prevBestMs!=null && total<prevBestMs) toast(`🏆 Новый рекорд! На ${fmtDelta(total-prevBestMs).slice(1)} с быстрее`);
+    else toast('Круг записан');
+  } else {
+    const cnt = Math.max(1, Math.min(999, Math.round(+mCount.value)||1));
+    laps.push({id:genId(), car:selCar, track:mTrack.value, date:mDate.value, ms:null, count:cnt, note:mNote.value.trim()});
+    save();
+    curTrack=mTrack.value; trackSel.value=curTrack; localStorage.setItem(LST,curTrack);
+    closeModal(); renderAll();
+    toast(`Записано ${cnt} ${ruLapsWord(cnt)} без времени`);
+  }
 }
 
 /* ---------- Toast ---------- */
@@ -505,9 +577,10 @@ function toast(msg,bad){
 function exportData(){
   const tl=trackLaps();
   if(!tl.length){ toast('Нет данных для экспорта',true); return; }
-  let csv='Дата,Авто,Трасса,Время,мс,Заметка\n';
+  let csv='Дата,Авто,Трасса,Время,мс,Кругов,Заметка\n';
   tl.sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>{
-    csv+=`${l.date},"${carById(l.car).name}","${trackById(l.track).name}",${fmt(l.ms)},${l.ms},"${(l.note||'').replace(/"/g,'""')}"\n`;
+    const timeStr = l.ms!=null ? fmt(l.ms) : 'без времени';
+    csv+=`${l.date},"${carById(l.car).name}","${trackById(l.track).name}",${timeStr},${l.ms!=null?l.ms:''},${lapCount(l)},"${(l.note||'').replace(/"/g,'""')}"\n`;
   });
   const blob=new Blob(['﻿'+csv],{type:'text/csv'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
@@ -523,6 +596,9 @@ saveBtn.onclick=saveLap;
 exportBtn.onclick=exportData;
 trackSel.onchange=()=>{curTrack=trackSel.value; localStorage.setItem(LST,curTrack); hidden.clear(); renderAll();};
 mTrack.onchange=updatePrevBest;
+modeToggle.querySelectorAll('.modeBtn').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+cntMinus.onclick=()=>{ mCount.value=Math.max(1,(+mCount.value||1)-1); };
+cntPlus.onclick=()=>{ mCount.value=Math.min(999,(+mCount.value||1)+1); };
 modal.onclick=e=>{if(e.target===modal)closeModal();};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();
   if(e.key==='Enter'&&modal.classList.contains('on'))saveLap();});
