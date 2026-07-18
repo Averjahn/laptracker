@@ -60,6 +60,49 @@ header{
 .stat .v.mono{font-variant-numeric:tabular-nums}
 .stat.hl .v{color:var(--gold)}
 
+/* Records */
+.recsec{position:relative;margin-bottom:26px;overflow:hidden}
+.recsec .recmap{position:absolute;top:-14px;right:-24px;width:230px;opacity:.07;pointer-events:none;z-index:0;
+  filter:grayscale(1) brightness(2)}
+.recsec h2 .rectrack{font-family:var(--sans);font-weight:500;font-size:12px;letter-spacing:0;text-transform:none;color:var(--mut)}
+.records{position:relative;z-index:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px;padding:18px}
+.record{position:relative;min-height:212px;border-radius:14px;overflow:hidden;border:1px solid var(--line2);
+  display:flex;flex-direction:column;justify-content:space-between;isolation:isolate;transition:.18s;--rc:var(--accent)}
+.record:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(0,0,0,.55)}
+.record__bg{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:center;
+  filter:saturate(1.05) contrast(1.02);transition:transform .4s}
+.record:hover .record__bg{transform:scale(1.05)}
+.record__scrim{position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg,rgba(8,10,14,.30) 0%,rgba(8,10,14,.52) 42%,rgba(8,10,14,.93) 100%)}
+.record__head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:12px 12px 0}
+.record__track{display:inline-flex;align-items:center;gap:5px;max-width:66%;
+  background:rgba(10,12,16,.55);backdrop-filter:blur(5px);border:1px solid rgba(255,255,255,.15);border-radius:20px;
+  padding:5px 11px;font-family:var(--mono);font-weight:600;font-size:11.5px;letter-spacing:.4px;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.record__rank{font-family:var(--mono);font-weight:700;font-size:12px;color:#e8edf4;
+  background:rgba(10,12,16,.55);backdrop-filter:blur(5px);border:1px solid rgba(255,255,255,.14);
+  border-radius:20px;padding:4px 10px;flex-shrink:0}
+.record__crown{font-family:var(--mono);font-weight:700;font-size:12px;letter-spacing:.6px;color:#1a1200;
+  background:linear-gradient(135deg,var(--gold),#ffe082);border:none;border-radius:20px;padding:5px 11px;flex-shrink:0;
+  box-shadow:0 4px 14px rgba(255,207,74,.4)}
+.record.rec-record{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold),0 16px 38px rgba(0,0,0,.5)}
+.record__main{display:flex;align-items:flex-end;gap:13px;padding:14px}
+.record__car{width:98px;flex-shrink:0}
+.record__car img{width:100%;height:62px;object-fit:cover;border-radius:10px;border:2px solid var(--rc);
+  box-shadow:0 6px 18px rgba(0,0,0,.55);display:block}
+.record__car .cn{font-family:var(--mono);font-weight:600;font-size:11px;letter-spacing:.3px;text-align:center;
+  margin-top:6px;color:#dfe6ef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.record__info{flex:1;min-width:0}
+.record__time{font-family:var(--mono);font-weight:700;font-size:clamp(30px,5vw,38px);line-height:.95;color:#fff;
+  font-variant-numeric:tabular-nums;text-shadow:0 2px 14px rgba(0,0,0,.65)}
+.record.rec-record .record__time{color:var(--gold)}
+.record__lbl{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:1.6px;text-transform:uppercase;
+  color:var(--rc);margin-bottom:3px}
+.record__sub{font-size:11.5px;color:var(--mut);margin-top:7px;display:flex;flex-wrap:wrap;gap:3px 10px;min-width:0}
+.record__sub b{color:#cfd7e2;font-weight:600}
+.recempty{padding:34px 18px;text-align:center;color:var(--mut);font-size:14px}
+.recempty svg{width:30px;height:30px;opacity:.4;margin-bottom:10px}
+
 /* Layout */
 .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:22px;align-items:start}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
@@ -192,6 +235,14 @@ label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-botto
 <div class="wrap">
   <div class="stats" id="stats"></div>
 
+  <!-- Records -->
+  <div class="card recsec">
+    <img class="recmap" id="recMap" src="" alt="" aria-hidden="true">
+    <h2><span class="dot"></span> Рекорды трассы <span class="grow" style="flex:1"></span>
+      <span class="rectrack" id="recTrackLbl"></span></h2>
+    <div class="records" id="records"></div>
+  </div>
+
   <div class="grid">
     <!-- Laps table -->
     <div class="card">
@@ -279,7 +330,7 @@ const CARS = [
   {id:'alfa155',name:'Alfa Romeo 155',full:'V6 TI · DTM · 2.5L V6',   img:'assets/cars/alfa155.jpg',color:'#a678ff'},
 ];
 const TRACKS = [
-  {id:'nords', name:'Nürburgring Nordschleife', len:'20.8 км'},
+  {id:'nords', name:'Nürburgring Nordschleife', len:'20.8 км', img:'assets/tracks/nords.jpg', map:'assets/tracks/nords_map.png'},
 ];
 const carById = id => CARS.find(c=>c.id===id);
 const trackById = id => TRACKS.find(t=>t.id===id);
@@ -355,6 +406,55 @@ function renderStats(){
 /* ---------- Table ---------- */
 function bestPerCar(tl){
   const m={}; tl.forEach(l=>{ if(l.ms==null) return; if(m[l.car]==null||l.ms<m[l.car]) m[l.car]=l.ms; }); return m;
+}
+
+/* ---------- Records ---------- */
+function renderRecords(){
+  const host=document.getElementById('records');
+  const t=trackById(curTrack);
+  // track layout watermark + label in section header
+  const mapEl=document.getElementById('recMap');
+  if(t.map){ mapEl.src=t.map; mapEl.style.display=''; } else { mapEl.style.display='none'; }
+  document.getElementById('recTrackLbl').textContent = `${t.name} · ${t.len}`;
+
+  const timed=trackLaps().filter(l=>l.ms!=null);
+  if(!timed.length){
+    host.innerHTML=`<div class="recempty">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 3 2-7L2 9h7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <div>Ещё нет кругов на время на этой трассе.<br>Запиши круг «⏱ На время» — и здесь появятся рекорды по каждой машине.</div></div>`;
+    return;
+  }
+  const pb=bestPerCar(timed); // {carId: bestMs}
+  const entries=Object.keys(pb).map(carId=>{
+    const bestLap=timed.filter(l=>l.car===carId).reduce((a,b)=>b.ms<a.ms?b:a);
+    return {car:carById(carId), ms:pb[carId], lap:bestLap};
+  }).filter(e=>e.car).sort((a,b)=>a.ms-b.ms);
+
+  const trackImg=t.img||'';
+  host.innerHTML=entries.map((e,i)=>{
+    const isRec=i===0;
+    const badge = isRec ? `<span class="record__crown">★ РЕКОРД</span>` : `<span class="record__rank">#${i+1}</span>`;
+    const note = e.lap.note ? `<span title="${e.lap.note.replace(/"/g,'&quot;')}">📝 ${e.lap.note.length>22?e.lap.note.slice(0,22)+'…':e.lap.note}</span>` : '';
+    return `<div class="record ${isRec?'rec-record':''}" style="--rc:${e.car.color}">
+      <div class="record__bg" style="background-image:url('${trackImg}')"></div>
+      <div class="record__scrim"></div>
+      <div class="record__head">
+        <span class="record__track">📍 ${t.name}</span>
+        ${badge}
+      </div>
+      <div class="record__main">
+        <div class="record__car">
+          <img src="${e.car.img}" alt="${e.car.name}" loading="lazy" onerror="this.style.display='none'">
+          <div class="cn">${e.car.name}</div>
+        </div>
+        <div class="record__info">
+          <div class="record__lbl">Лучший круг</div>
+          <div class="record__time">${fmt(e.ms)}</div>
+          <div class="record__sub"><span><b>${e.car.full}</b></span><span>${ruDate(e.lap.date)}</span>${note}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 function renderTable(){
   const tl = trackLaps();
@@ -588,7 +688,7 @@ function exportData(){
 }
 
 /* ---------- Wire up ---------- */
-function renderAll(){ renderStats(); renderTable(); renderLegend(); drawChart(); }
+function renderAll(){ renderStats(); renderRecords(); renderTable(); renderLegend(); drawChart(); }
 addBtn.onclick=openModal;
 cancelBtn.onclick=closeModal;
 saveBtn.onclick=saveLap;
