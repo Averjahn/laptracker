@@ -126,7 +126,7 @@ label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-botto
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
 /* Car picker */
-.cars{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:6px}
+.cars{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:6px;max-height:44vh;overflow-y:auto;padding-right:4px}
 .carcard{position:relative;border:1px solid var(--line2);border-radius:12px;overflow:hidden;cursor:pointer;background:var(--bg2);transition:.18s}
 .carcard img{width:100%;height:88px;object-fit:cover;display:block;filter:saturate(1.05) contrast(1.03)}
 .carcard .carsil-wrap{width:100%;height:88px;background:var(--bg2);display:flex;align-items:center;justify-content:center}
@@ -200,9 +200,10 @@ label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-botto
 /* Modal */
 .modal{position:fixed;inset:0;background:rgba(5,7,10,.7);backdrop-filter:blur(6px);z-index:50;display:none;place-items:center;padding:20px}
 .modal.on{display:grid}
-.modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:440px;width:100%;box-shadow:var(--shadow);overflow:hidden}
-.modal h3{font-family:var(--mono);font-weight:700;letter-spacing:1px;padding:18px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:16px}
-.modal .mb{padding:18px}
+.modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:440px;width:100%;box-shadow:var(--shadow);
+  overflow:hidden;max-height:90vh;display:flex;flex-direction:column}
+.modal h3{font-family:var(--mono);font-weight:700;letter-spacing:1px;padding:18px;border-bottom:1px solid var(--line);text-transform:uppercase;font-size:16px;flex-shrink:0}
+.modal .mb{padding:18px;overflow-y:auto;flex:1;min-height:0}
 .modal .mf{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end}
 
 /* toast */
