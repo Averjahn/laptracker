@@ -139,6 +139,9 @@ label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin-botto
 .carcard.sel{box-shadow:0 8px 24px rgba(255,46,77,.28)}
 .carcard .badge{position:absolute;top:8px;right:8px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;opacity:0;transition:.18s}
 .carcard.sel .badge{opacity:1}
+.carcard .usedTag{position:absolute;top:8px;left:8px;z-index:1;background:var(--panel2);color:var(--gold);font-size:10px;font-weight:700;padding:3px 7px;border-radius:20px;border:1px solid var(--line2)}
+.carsGroupTitle{grid-column:1/-1;font-family:var(--mono);font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);padding-top:2px}
+.carsGroupTitle:not(:first-child){margin-top:6px}
 
 /* Time input */
 .timegrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
@@ -811,16 +814,36 @@ function setMode(m){
   countField.style.display = m==='count' ? '' : 'none';
   setTimeout(()=>{ (m==='timed'?mMin:mCount).focus(); }, 30);
 }
+function carCardHTML(c, usage){
+  const n = usage[c.id];
+  return `
+    <div class="carcard ${c.id===selCar?'sel':''}" data-id="${c.id}">
+      <span class="badge">✓ Выбрано</span>
+      ${n?`<span class="usedTag">🏁 ${n}</span>`:''}
+      ${carVisual(c)}
+      <div class="cn">${c.name}<small>${c.full}</small></div>
+    </div>`;
+}
 function renderCarPicker(){
   carCountLbl.textContent = `(${CARS.length} машин Assetto Corsa)`;
   const q = (carSearch.value||'').trim().toLowerCase();
   const list = q ? CARS.filter(c=>c.name.toLowerCase().includes(q)||c.full.toLowerCase().includes(q)) : CARS;
-  carPicker.innerHTML = list.length ? list.map(c=>`
-    <div class="carcard ${c.id===selCar?'sel':''}" data-id="${c.id}">
-      <span class="badge">✓ Выбрано</span>
-      ${carVisual(c)}
-      <div class="cn">${c.name}<small>${c.full}</small></div>
-    </div>`).join('') : `<div class="mini" style="padding:14px">Ничего не найдено</div>`;
+  const usage = {};
+  laps.forEach(l=>{ usage[l.car] = (usage[l.car]||0) + lapCount(l); });
+
+  let html;
+  if(!list.length){
+    html = `<div class="mini" style="padding:14px">Ничего не найдено</div>`;
+  } else if(q){
+    html = list.map(c=>carCardHTML(c, usage)).join('');
+  } else {
+    const used = list.filter(c=>usage[c.id]).sort((a,b)=>usage[b.id]-usage[a.id]);
+    const rest = list.filter(c=>!usage[c.id]);
+    html = '';
+    if(used.length) html += `<div class="carsGroupTitle">Уже ездили</div>` + used.map(c=>carCardHTML(c, usage)).join('');
+    if(rest.length) html += `<div class="carsGroupTitle">Все машины</div>` + rest.map(c=>carCardHTML(c, usage)).join('');
+  }
+  carPicker.innerHTML = html;
   carPicker.querySelectorAll('.carcard').forEach(el=>el.onclick=()=>{
     selCar=el.dataset.id; carSearch.value=''; renderCarPicker(); updatePrevBest();
   });
